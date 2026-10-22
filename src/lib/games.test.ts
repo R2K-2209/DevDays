@@ -5,6 +5,7 @@ import type { Database } from './db';
 import {
     getAllGames,
     getAllGameIds,
+    getFilteredGames,
     getGameById,
 } from './games';
 
@@ -30,6 +31,62 @@ async function seedGames(db: Database, count: number): Promise<void> {
     }
 }
 
+async function seedFilterGames(db: Database): Promise<{
+    strategyCategoryId: number;
+    puzzleCategoryId: number;
+    codeForgeId: number;
+}> {
+    const [strategy] = await db
+        .insert(categories)
+        .values({ name: 'Strategy', description: 'Strategy games' })
+        .returning({ id: categories.id });
+    const [puzzle] = await db
+        .insert(categories)
+        .values({ name: 'Puzzle', description: 'Puzzle games' })
+        .returning({ id: categories.id });
+    const [codeForge] = await db
+        .insert(publishers)
+        .values({ name: 'CodeForge Studios', description: 'Publisher' })
+        .returning({ id: publishers.id });
+    const [devMasters] = await db
+        .insert(publishers)
+        .values({ name: 'DevMasters Inc.', description: 'Publisher' })
+        .returning({ id: publishers.id });
+
+    await db.insert(games).values([
+        {
+            title: 'DevOps Dominion',
+            description: 'A strategy game',
+            categoryId: strategy.id,
+            publisherId: codeForge.id,
+        },
+        {
+            title: 'Pipeline Conquest',
+            description: 'Another strategy game',
+            categoryId: strategy.id,
+            publisherId: devMasters.id,
+        },
+        {
+            title: 'Code Puzzle Chronicles',
+            description: 'A puzzle game',
+            categoryId: puzzle.id,
+            publisherId: codeForge.id,
+        },
+        {
+            title: 'Merge Conflict Mystery',
+            description: 'Another puzzle game',
+            categoryId: puzzle.id,
+            publisherId: devMasters.id,
+        },
+    ]);
+
+    return {
+        strategyCategoryId: strategy.id,
+        puzzleCategoryId: puzzle.id,
+        codeForgeId: codeForge.id,
+    };
+}
+
 describe('games data-access helpers', () => {
     let db: Database;
 
@@ -43,6 +100,40 @@ describe('games data-access helpers', () => {
         expect(all.map((g) => g.title)).toEqual(['Game 01', 'Game 02', 'Game 03']);
         expect(all[0].category).toEqual({ id: expect.any(Number), name: 'Strategy' });
         expect(all[0].publisher).toEqual({ id: expect.any(Number), name: 'Pub One' });
+    });
+
+    it('matches any selected category and combines categories with publisher', async () => {
+        const { strategyCategoryId, puzzleCategoryId, codeForgeId } = await seedFilterGames(db);
+
+        const matchingCategories = await getFilteredGames(db, {
+            categoryIds: [strategyCategoryId, puzzleCategoryId],
+        });
+        expect(matchingCategories.map((game) => game.title)).toEqual([
+            'Code Puzzle Chronicles',
+            'DevOps Dominion',
+            'Merge Conflict Mystery',
+            'Pipeline Conquest',
+        ]);
+
+        const matchingCategoriesAndPublisher = await getFilteredGames(db, {
+            categoryIds: [strategyCategoryId, puzzleCategoryId],
+            publisherId: codeForgeId,
+        });
+        expect(matchingCategoriesAndPublisher.map((game) => game.title)).toEqual([
+            'Code Puzzle Chronicles',
+            'DevOps Dominion',
+        ]);
+    });
+
+    it('filters by publisher without category restrictions', async () => {
+        const { codeForgeId } = await seedFilterGames(db);
+
+        const matchingGames = await getFilteredGames(db, { publisherId: codeForgeId });
+
+        expect(matchingGames.map((game) => game.title)).toEqual([
+            'Code Puzzle Chronicles',
+            'DevOps Dominion',
+        ]);
     });
 
     it('returns all game ids ordered by title', async () => {
