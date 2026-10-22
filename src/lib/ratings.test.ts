@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clampRating, formatStarRating } from './ratings';
+import { clampRating, formatRatingLabel, formatStarRating } from './ratings';
 
 describe('clampRating', () => {
     it('returns the value unchanged when within range', () => {
@@ -47,5 +47,15 @@ describe('formatStarRating', () => {
 
     it('is deterministic for the same input', () => {
         expect(formatStarRating(3.5)).toBe(formatStarRating(3.5));
+    });
+});
+
+describe('formatRatingLabel', () => {
+    it('shows a message when a game has no rating', () => {
+        expect(formatRatingLabel(null)).toBe('No rating yet');
+    });
+
+    it('formats a rating as a value out of five', () => {
+        expect(formatRatingLabel(4.2)).toBe('4.2 / 5');
     });
 });
