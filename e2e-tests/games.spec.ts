@@ -1,6 +1,68 @@
 import { test, expect, type Response } from '@playwright/test';
 
 test.describe('Game Listing and Navigation', () => {
+  test.describe('Game catalog filters', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto('/');
+    });
+
+    test('filters games by category using the keyboard', async ({ page }) => {
+      const strategyFilter = page.getByRole('checkbox', { name: 'Strategy' });
+      await strategyFilter.focus();
+      await strategyFilter.press('Space');
+
+      await expect(strategyFilter).toBeChecked();
+      await expect(
+        page.getByTestId('game-card').filter({ hasText: 'DevOps Dominion' }),
+      ).toBeVisible();
+      await expect(
+        page.getByTestId('game-card').filter({ hasText: 'Code Puzzle Chronicles' }),
+      ).toBeHidden();
+    });
+
+    test('filters games by publisher', async ({ page }) => {
+      await page.getByRole('combobox', { name: 'Filter by publisher' }).selectOption({
+        label: 'CodeForge Studios',
+      });
+
+      await expect(
+        page.getByTestId('game-card').filter({ hasText: 'DevOps Dominion' }),
+      ).toBeVisible();
+      await expect(
+        page.getByTestId('game-card').filter({ hasText: 'Pipeline Conquest' }),
+      ).toBeHidden();
+    });
+
+    test('combines multiple categories with publisher and clears filters', async ({ page }) => {
+      await page.getByRole('checkbox', { name: 'Strategy' }).check();
+      await page.getByRole('checkbox', { name: 'Puzzle' }).check();
+      await page.getByRole('combobox', { name: 'Filter by publisher' }).selectOption({
+        label: 'CodeForge Studios',
+      });
+
+      await expect(page.getByTestId('filter-result-count')).toHaveText('Showing 2 games');
+      await expect(
+        page.getByTestId('game-card').filter({ hasText: 'DevOps Dominion' }),
+      ).toBeVisible();
+      await expect(
+        page.getByTestId('game-card').filter({ hasText: 'Code Puzzle Chronicles' }),
+      ).toBeVisible();
+      await expect(
+        page.getByTestId('game-card').filter({ hasText: 'Virtual Server Simulator' }),
+      ).toBeHidden();
+
+      const totalGames = await page.getByTestId('game-card').count();
+      await page.getByTestId('clear-filters').click();
+
+      await expect(page.getByTestId('filter-result-count')).toHaveText(
+        `Showing ${totalGames} games`,
+      );
+      await expect(
+        page.getByTestId('game-card').filter({ hasText: 'Virtual Server Simulator' }),
+      ).toBeVisible();
+    });
+  });
+
   test('should display games with titles on index page', async ({ page }) => {
     await test.step('Navigate to homepage', async () => {
       await page.goto('/');
